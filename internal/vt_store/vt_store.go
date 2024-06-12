@@ -44,11 +44,7 @@ func CreateFileStore(path string) (*FileStore, error) {
 }
 
 func (fs FileStore) Finish() error {
-	err := fs.file.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return fs.file.Close()
 }
 
 func (fs FileStore) Load() string {

@@ -1,67 +1,85 @@
 package hb_tracker
 
 import (
+	"aardappel/internal/types"
 	"fmt"
 )
 
 type heartBeat struct {
-	vt    uint64
-	known bool
+	vt uint64
 }
 
 type HeartBeatTracker struct {
-	streams []heartBeat
+	streams         map[types.StreamId]heartBeat
+	totalStreamsNum int
 }
 
-func NewHeartBeatTracker(parts uint32) *HeartBeatTracker {
-	if parts == 0 {
+func NewHeartBeatTracker(total int) *HeartBeatTracker {
+	if total == 0 {
 		return nil
 	}
 
 	var hbt HeartBeatTracker
-	hbt.streams = make([]heartBeat, parts)
+	hbt.streams = make(map[types.StreamId]heartBeat)
+	hbt.totalStreamsNum = total
 	return &hbt
 }
 
-func (ht *HeartBeatTracker) Size() uint32 {
-	return uint32(len(ht.streams))
-}
-
-func (ht *HeartBeatTracker) AddHb(step uint64, part uint32) error {
-	if part >= uint32(len(ht.streams)) {
-		return fmt.Errorf("HeartBeat from unexpected part: %d", part)
-	}
-
-	hb := &ht.streams[part]
-
-	if !hb.known {
-		hb.vt = step
-		hb.known = true
-	} else {
-		if hb.vt > step {
+func (ht *HeartBeatTracker) AddHb(data types.HbData) error {
+	hb, ok := ht.streams[data.PartitionId]
+	if ok {
+		if hb.vt > data.Step {
 			return fmt.Errorf("attempt to add step: %d less then last vsible: %d for part: %d",
-				step, hb.vt, part)
+				data.Step, hb.vt, data.PartitionId)
 		} else {
-			hb.vt = step
-			hb.known = true
+			hb.vt = data.Step
 		}
+	} else {
+		hb.vt = data.Step
+	}
+	ht.streams[data.PartitionId] = hb
+
+	if len(ht.streams) > ht.totalStreamsNum {
+		return fmt.Errorf("Resulted stream count: %d grather than total count: %d",
+			len(ht.streams), ht.totalStreamsNum)
 	}
 	return nil
 }
 
-func (ht *HeartBeatTracker) GetReady() (uint64, bool) {
-	if !ht.streams[0].known {
-		return 0, false
+func (ht *HeartBeatTracker) GetReady() (types.HbData, bool) {
+	var resHb types.HbData
+
+	if len(ht.streams) != ht.totalStreamsNum {
+		return resHb, false
 	}
 
-	maybeMin := ht.streams[0].vt
-
-	for i := 1; i < len(ht.streams); i++ {
-		if !ht.streams[i].known {
-			return 0, false
+	var inited bool
+	for k, v := range ht.streams {
+		if !inited {
+			resHb.PartitionId = k
+			resHb.Step = v.vt
+			inited = true
+		} else {
+			if v.vt < resHb.Step {
+				resHb.PartitionId = k
+				resHb.Step = v.vt
+			}
 		}
-		maybeMin = min(maybeMin, ht.streams[i].vt)
 	}
 
-	return maybeMin, true
+	return resHb, true
+}
+
+func (ht *HeartBeatTracker) Commit(data types.HbData) bool {
+	hb, ok := ht.streams[data.PartitionId]
+	if !ok {
+		return true
+	} else {
+		if hb.vt > data.Step {
+			return false
+		} else {
+			delete(ht.streams, data.PartitionId)
+			return true
+		}
+	}
 }

@@ -28,10 +28,7 @@ func NewHeartBeatTracker(total int) *HeartBeatTracker {
 func (ht *HeartBeatTracker) AddHb(data types.HbData) error {
 	hb, ok := ht.streams[data.PartitionId]
 	if ok {
-		if hb.vt > data.Step {
-			return fmt.Errorf("attempt to add step: %d less then last vsible: %d for part: %d",
-				data.Step, hb.vt, data.PartitionId)
-		} else {
+		if hb.vt < data.Step {
 			hb.vt = data.Step
 		}
 	} else {

@@ -71,12 +71,11 @@ func (ht *HeartBeatTracker) Commit(data types.HbData) bool {
 	hb, ok := ht.streams[data.PartitionId]
 	if !ok {
 		return true
+	}
+	if hb.vt > data.Step {
+		return false
 	} else {
-		if hb.vt > data.Step {
-			return false
-		} else {
-			delete(ht.streams, data.PartitionId)
-			return true
-		}
+		delete(ht.streams, data.PartitionId)
+		return true
 	}
 }

@@ -10,7 +10,7 @@ type TxQueue struct {
 }
 
 func NewTxQueue() *TxQueue {
-	pq := new(PriorityQueue)
+	pq := NewPriorityQueue()
 	heap.Init(pq)
 	return &TxQueue{pq}
 }

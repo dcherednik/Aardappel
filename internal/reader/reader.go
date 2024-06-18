@@ -71,7 +71,7 @@ func ParseTxData(ctx context.Context, jsonData []byte) (types.TxData, error) {
 	return data, nil
 }
 
-func ParseHBData(ctx context.Context, jsonData []byte, streamId types.TStreamId) (types.HbData, error) {
+func ParseHBData(ctx context.Context, jsonData []byte, streamId types.StreamId) (types.HbData, error) {
 	var resolvedData TopicResolvedData
 	err := json.Unmarshal(jsonData, &resolvedData)
 	if err != nil {
@@ -120,7 +120,7 @@ func ReadTopic(ctx context.Context, readerId uint8, reader *topicreader.Reader) 
 			ParseTxData(ctx, jsonData)
 			// Add tx to txQueue
 		} else if topicData.Resolved != nil {
-			ParseHBData(ctx, jsonData, types.TStreamId{readerId, msg.PartitionID()})
+			ParseHBData(ctx, jsonData, types.StreamId{readerId, msg.PartitionID()})
 			// Update last hb for partition
 		} else {
 			xlog.Error(ctx, "Unknown format of topic message")

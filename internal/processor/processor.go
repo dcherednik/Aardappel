@@ -21,6 +21,11 @@ type Channel interface {
 	EnqueueHb(heartbeat types.HbData)
 }
 
+type TxBatch struct {
+	TxData []types.TxData
+	Hb     types.HbData
+}
+
 func (processor *Processor) EnqueueHb(hb types.HbData) {
 	processor.txChannel <- func() error {
 		return processor.hbTracker.AddHb(hb)
@@ -34,7 +39,7 @@ func (processor *Processor) EnqueueTx(tx types.TxData) {
 	}
 }
 
-func (processor *Processor) FormatTx(ctx context.Context) error {
+func (processor *Processor) FormatTx(ctx context.Context) (TxBatch, error) {
 	var hb types.HbData
 	var maxEventPerIteration int = 100
 	for {
@@ -45,7 +50,7 @@ func (processor *Processor) FormatTx(ctx context.Context) error {
 			case fn := <-processor.txChannel:
 				err := fn()
 				if err != nil {
-					return err
+					return nil, err
 				}
 				continue
 			default:
@@ -70,4 +75,10 @@ func (processor *Processor) FormatTx(ctx context.Context) error {
 			zap.Uint64("step", data.Step),
 			zap.Uint64("tx_id", data.TxId))
 	}
+	return TxBatch{TxData: txs, Hb: hb}, nil
+}
+
+func (processor *Processor) ConfirmTx(batch TxBatch) {
+	processor.txQueue.CleanTxs(batch.Hb.Step)
+	processor.hbTracker.Commit(batch.Hb)
 }

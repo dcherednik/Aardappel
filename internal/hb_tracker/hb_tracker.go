@@ -14,6 +14,10 @@ type HeartBeatTracker struct {
 	totalStreamsNum int
 }
 
+type Feeder interface {
+	AddHb(data types.HbData) error
+}
+
 func NewHeartBeatTracker(total int) *HeartBeatTracker {
 	if total == 0 {
 		return nil

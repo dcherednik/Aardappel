@@ -3,6 +3,7 @@ package main
 import (
 	configInit "aardappel/internal/config"
 	"aardappel/internal/dst_table"
+	processor "aardappel/internal/processor"
 	topicReader "aardappel/internal/reader"
 	"aardappel/internal/util/xlog"
 	"context"
@@ -10,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"go.uber.org/zap"
+	"time"
 )
 
 func main() {
@@ -49,6 +51,7 @@ func main() {
 	xlog.Debug(ctx, "YDB opened")
 
 	var readerId uint8 = 0
+	processor := processor.NewProcessor(2)
 	for i := 0; i < len(config.Streams); i++ {
 		reader, err := srcDb.Topic().StartReader(config.Streams[i].Consumer, topicoptions.ReadTopic(config.Streams[i].SrcTopic))
 		if err != nil {
@@ -58,11 +61,16 @@ func main() {
 				zap.Error(err))
 		}
 		xlog.Debug(ctx, "Start reading")
-		go topicReader.ReadTopic(ctx, readerId, reader)
+		go topicReader.ReadTopic(ctx, readerId, reader, processor)
 		readerId++
 	}
 
-	//time.Sleep(20 * time.Second)
+	_, err = processor.FormatTx(ctx)
+	if err == nil {
+		xlog.Fatal(ctx, "Unable to format tx for destination")
+	}
+
+	time.Sleep(20 * time.Second)
 
 	db, err := ydb.Open(ctx, config.DstConnectionString)
 	if err != nil {

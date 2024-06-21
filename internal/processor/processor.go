@@ -35,14 +35,12 @@ func NewProcessor(total int) *Processor {
 }
 
 func (processor *Processor) EnqueueHb(ctx context.Context, hb types.HbData) {
-	//xlog.Debug(ctx, "EnqueueHb")
 	processor.txChannel <- func() error {
 		return processor.hbTracker.AddHb(hb)
 	}
 }
 
 func (processor *Processor) EnqueueTx(ctx context.Context, tx types.TxData) {
-	//xlog.Debug(ctx, "EnqueueTx")
 	processor.txChannel <- func() error {
 		processor.txQueue.PushTx(tx)
 		return nil
@@ -55,30 +53,24 @@ func (processor *Processor) FormatTx(ctx context.Context) (*TxBatch, error) {
 		var maxEventPerIteration int = 100
 		for maxEventPerIteration > 0 {
 			maxEventPerIteration--
-
-			//xlog.Debug(ctx, "wait event")
 			select {
 			case fn := <-processor.txChannel:
-				//xlog.Debug(ctx, "Got fn")
 				err := fn()
 				if err != nil {
 					xlog.Debug(ctx, "Unable to push event")
 					return nil, err
 				}
 			default:
-				//	xlog.Debug(ctx, "Empty queue")
 				maxEventPerIteration = 0
 			}
 		}
 		var ok bool
 		hb, ok = processor.hbTracker.GetReady()
 		if ok {
-			//	xlog.Debug(ctx, "Got ready hb ", zap.Any("step", hb.Step))
+			xlog.Debug(ctx, "Got ready hb ", zap.Any("step", hb.Step))
 			break
 		}
-		//TODO: Wait hb here
-
-		//xlog.Debug(ctx, "Wait for heartbeat")
+		//TODO: Wait any hb instead of sleep here
 		time.Sleep(1 * time.Millisecond)
 	}
 	// Here we have heartbeat and filled TxQueue - ready to format TX
@@ -94,7 +86,4 @@ func (processor *Processor) FormatTx(ctx context.Context) (*TxBatch, error) {
 			zap.Uint64("tx_id", data.TxId))
 	}
 	return &TxBatch{TxData: txs, Hb: hb}, nil
-}
-
-func (processor *Processor) ConfirmTx(batch TxBatch) {
 }

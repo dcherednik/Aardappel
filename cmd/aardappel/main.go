@@ -50,8 +50,22 @@ func main() {
 	}
 	xlog.Debug(ctx, "YDB opened")
 
+	var totalPartitions int
+	for i := 0; i < len(config.Streams); i++ {
+		desc, err := srcDb.Topic().Describe(ctx, config.Streams[i].SrcTopic)
+		if err != nil {
+			xlog.Fatal(ctx, "Unable to describe topic",
+				zap.String("src_topic", config.Streams[i].SrcTopic),
+				zap.Error(err))
+		}
+		totalPartitions += len(desc.Partitions)
+	}
+
+	xlog.Debug(ctx, "All topics described",
+		zap.Int("total parts", totalPartitions))
+
 	var readerId uint8 = 0
-	processor := processor.NewProcessor(2)
+	prc := processor.NewProcessor(totalPartitions)
 	for i := 0; i < len(config.Streams); i++ {
 		reader, err := srcDb.Topic().StartReader(config.Streams[i].Consumer, topicoptions.ReadTopic(config.Streams[i].SrcTopic))
 		if err != nil {
@@ -61,12 +75,12 @@ func main() {
 				zap.Error(err))
 		}
 		xlog.Debug(ctx, "Start reading")
-		go topicReader.ReadTopic(ctx, readerId, reader, processor)
+		go topicReader.ReadTopic(ctx, readerId, reader, prc)
 		readerId++
 	}
 
 	for {
-		_, err = processor.FormatTx(ctx)
+		_, err = prc.FormatTx(ctx)
 		if err != nil {
 			xlog.Fatal(ctx, "Unable to format tx for destination")
 		}

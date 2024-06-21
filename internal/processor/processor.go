@@ -13,12 +13,12 @@ import (
 type Processor struct {
 	txChannel chan func() error
 	hbTracker *hb_tracker.HeartBeatTracker
-	txQueue   tx_queue.TxQueue
+	txQueue   *tx_queue.TxQueue
 }
 
 type Channel interface {
-	EnqueueTx(data types.TxData)
-	EnqueueHb(heartbeat types.HbData)
+	EnqueueTx(ctx context.Context, data types.TxData)
+	EnqueueHb(ctx context.Context, heartbeat types.HbData)
 }
 
 type TxBatch struct {
@@ -29,16 +29,20 @@ type TxBatch struct {
 func NewProcessor(total int) *Processor {
 	var p Processor
 	p.hbTracker = hb_tracker.NewHeartBeatTracker(total)
+	p.txChannel = make(chan func() error)
+	p.txQueue = tx_queue.NewTxQueue()
 	return &p
 }
 
-func (processor *Processor) EnqueueHb(hb types.HbData) {
+func (processor *Processor) EnqueueHb(ctx context.Context, hb types.HbData) {
+	//xlog.Debug(ctx, "EnqueueHb")
 	processor.txChannel <- func() error {
 		return processor.hbTracker.AddHb(hb)
 	}
 }
 
-func (processor *Processor) EnqueueTx(tx types.TxData) {
+func (processor *Processor) EnqueueTx(ctx context.Context, tx types.TxData) {
+	//xlog.Debug(ctx, "EnqueueTx")
 	processor.txChannel <- func() error {
 		processor.txQueue.PushTx(tx)
 		return nil
@@ -47,34 +51,38 @@ func (processor *Processor) EnqueueTx(tx types.TxData) {
 
 func (processor *Processor) FormatTx(ctx context.Context) (*TxBatch, error) {
 	var hb types.HbData
-	var maxEventPerIteration int = 100
 	for {
+		var maxEventPerIteration int = 100
 		for maxEventPerIteration > 0 {
 			maxEventPerIteration--
 
+			//xlog.Debug(ctx, "wait event")
 			select {
 			case fn := <-processor.txChannel:
+				//xlog.Debug(ctx, "Got fn")
 				err := fn()
 				if err != nil {
+					xlog.Debug(ctx, "Unable to push event")
 					return nil, err
 				}
-				continue
 			default:
-				break
+				//	xlog.Debug(ctx, "Empty queue")
+				maxEventPerIteration = 0
 			}
 		}
 		var ok bool
 		hb, ok = processor.hbTracker.GetReady()
 		if ok {
-			xlog.Debug(ctx, "Got ready hb ", zap.Any("step", hb.Step))
+			//	xlog.Debug(ctx, "Got ready hb ", zap.Any("step", hb.Step))
 			break
 		}
 		//TODO: Wait hb here
 
-		xlog.Debug(ctx, "Wait for heartbeat")
+		//xlog.Debug(ctx, "Wait for heartbeat")
 		time.Sleep(1 * time.Millisecond)
 	}
 	// Here we have heartbeat and filled TxQueue - ready to format TX
+	xlog.Debug(ctx, "Trying to pop tx until", zap.Any("step", hb.Step))
 	txs := processor.txQueue.PopTxs(hb.Step)
 	processor.hbTracker.Commit(hb)
 	for _, data := range txs {

@@ -65,9 +65,11 @@ func main() {
 		readerId++
 	}
 
-	_, err = processor.FormatTx(ctx)
-	if err == nil {
-		xlog.Fatal(ctx, "Unable to format tx for destination")
+	for {
+		_, err = processor.FormatTx(ctx)
+		if err != nil {
+			xlog.Fatal(ctx, "Unable to format tx for destination")
+		}
 	}
 
 	time.Sleep(20 * time.Second)

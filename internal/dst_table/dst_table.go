@@ -11,11 +11,13 @@ import (
 )
 
 type PushQuery struct {
-	Query string
+	Query      string
+	Parameters table.QueryParameters
 }
 
 type TableMetaInfo struct {
 	PrimaryKey []string
+	Columns    []options.Column
 }
 
 type DstTable struct {
@@ -53,13 +55,14 @@ func (dstTable *DstTable) Init(ctx context.Context) error {
 	}
 	var metaInfo TableMetaInfo
 	metaInfo.PrimaryKey = desc.PrimaryKey
-	xlog.Debug(ctx, "Got table meta info", zap.Strings("primary_keys", metaInfo.PrimaryKey))
+	metaInfo.Columns = desc.Columns
+	xlog.Debug(ctx, "Got table meta info", zap.Strings("primary_keys", metaInfo.PrimaryKey), zap.Any("columns", metaInfo.Columns))
 	dstTable.tableInfo = metaInfo
 	return nil
 }
 
 func (dstTable *DstTable) Push(ctx context.Context, txData []types.TxData) error {
-	_, err := GenQuery(ctx, dstTable.tablePath, dstTable.tableInfo.PrimaryKey, txData)
+	_, err := GenQuery(ctx, dstTable.tablePath, dstTable.tableInfo, txData)
 	if err != nil {
 		xlog.Error(ctx, "Can't gen query", zap.Error(err))
 		return fmt.Errorf("Push: %w", err)

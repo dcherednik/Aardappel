@@ -29,15 +29,19 @@ func GetSortColumns(keyValuesMap map[string]interface{}) []KeyValue {
 	return result
 }
 
-func GenQueryFromUpdateTx(ctx context.Context, tablePath string, primaryKeys []string, txData types.TxData) (string, error) {
+type QueryGenerator struct {
+	//params
+}
+
+func GenQueryFromUpdateTx(ctx context.Context, tablePath string, tableMetaInfo TableMetaInfo, txData types.TxData) (string, error) {
 	var result string
-	if len(primaryKeys) != len(txData.KeyValues) {
+	if len(tableMetaInfo.PrimaryKey) != len(txData.KeyValues) {
 		xlog.Error(ctx, "Len of primary key is not equal to len of values",
-			zap.Int("len of primary keys", len(primaryKeys)),
+			zap.Int("len of primary keys", len(tableMetaInfo.PrimaryKey)),
 			zap.Int("len of values", len(txData.KeyValues)))
 		return "", fmt.Errorf("GenQueryFromUpdateTx: len of primary key is not equal to len of values")
 	}
-	result = "UPSERT INTO " + tablePath + " (" + strings.Join(primaryKeys, ", ")
+	result = "UPSERT INTO " + tablePath + " (" + strings.Join(tableMetaInfo.PrimaryKey, ", ")
 	columnValues := GetSortColumns(txData.ColumnValues)
 	for i := range columnValues {
 		result += ", "
@@ -51,7 +55,7 @@ func GenQueryFromUpdateTx(ctx context.Context, tablePath string, primaryKeys []s
 			return "", fmt.Errorf("GenQueryFromUpdateTx: %w", err)
 		}
 		result += string(jsonData)
-		if i != len(primaryKeys)-1 {
+		if i != len(tableMetaInfo.PrimaryKey)-1 {
 			result += ", "
 		}
 	}
@@ -69,23 +73,23 @@ func GenQueryFromUpdateTx(ctx context.Context, tablePath string, primaryKeys []s
 	return result, nil
 }
 
-func GenQueryFromEraseTx(ctx context.Context, tablePath string, primaryKeys []string, txData types.TxData) (string, error) {
+func GenQueryFromEraseTx(ctx context.Context, tablePath string, tableMetaInfo TableMetaInfo, txData types.TxData) (string, error) {
 	var result string
-	if len(primaryKeys) != len(txData.KeyValues) {
+	if len(tableMetaInfo.PrimaryKey) != len(txData.KeyValues) {
 		xlog.Error(ctx, "Len of primary key is not equal to len of values",
-			zap.Int("len of primary keys", len(primaryKeys)),
+			zap.Int("len of primary keys", len(tableMetaInfo.PrimaryKey)),
 			zap.Int("len of values", len(txData.KeyValues)))
 		return "", fmt.Errorf("GenQueryFromEraseTx: len of primary key is not equal to len of values")
 	}
 	result = "DELETE FROM " + tablePath + " WHERE "
-	for i := range primaryKeys {
+	for i := range tableMetaInfo.PrimaryKey {
 		jsonData, err := json.Marshal(txData.KeyValues[i])
 		if err != nil {
 			xlog.Error(ctx, "Can't parse key value", zap.Error(err))
 			return "", fmt.Errorf("GenQueryFromEraseTx: %w", err)
 		}
-		result += primaryKeys[i] + " = " + string(jsonData)
-		if i != len(primaryKeys)-1 {
+		result += tableMetaInfo.PrimaryKey[i] + " = " + string(jsonData)
+		if i != len(tableMetaInfo.PrimaryKey)-1 {
 			result += ", "
 		} else {
 			result += ";\n"
@@ -94,22 +98,22 @@ func GenQueryFromEraseTx(ctx context.Context, tablePath string, primaryKeys []st
 	return result, nil
 }
 
-func GenQueryFromTx(ctx context.Context, tablePath string, primaryKeys []string, txData types.TxData) (string, error) {
+func GenQueryFromTx(ctx context.Context, tablePath string, tableMetaInfo TableMetaInfo, txData types.TxData) (string, error) {
 	var result string
 	if txData.IsUpdateOperation() {
-		return GenQueryFromUpdateTx(ctx, tablePath, primaryKeys, txData)
+		return GenQueryFromUpdateTx(ctx, tablePath, tableMetaInfo, txData)
 	}
 	if txData.IsEraseOperation() {
-		return GenQueryFromEraseTx(ctx, tablePath, primaryKeys, txData)
+		return GenQueryFromEraseTx(ctx, tablePath, tableMetaInfo, txData)
 	}
 	xlog.Error(ctx, "GenQueryFromTx: unknown data tx operation type", zap.Any("tx_data", txData))
 	return result, fmt.Errorf("GenQueryFromTx: unknown data tx operation type")
 }
 
-func GenQuery(ctx context.Context, tablePath string, primaryKeys []string, txData []types.TxData) (PushQuery, error) {
+func GenQuery(ctx context.Context, tablePath string, tableMetaInfo TableMetaInfo, txData []types.TxData) (PushQuery, error) {
 	var result PushQuery
 	for i := range txData {
-		txQuery, err := GenQueryFromTx(ctx, tablePath, primaryKeys, txData[i])
+		txQuery, err := GenQueryFromTx(ctx, tablePath, tableMetaInfo, txData[i])
 		if err != nil {
 			xlog.Error(ctx, "Can't gen query", zap.Any("tx_data", txData[i]))
 			return PushQuery{}, fmt.Errorf("GenQuery: %w", err)

@@ -11,11 +11,18 @@ import (
 )
 
 type PushQuery struct {
-	Query string
+	Query      string
+	Parameters table.QueryParameters
 }
 
 type TableMetaInfo struct {
 	PrimaryKey []string
+	Columns    map[string]options.Column
+	Name       string
+}
+
+func NewTableMetaInfo() *TableMetaInfo {
+	return &TableMetaInfo{PrimaryKey: make([]string, 0), Columns: make(map[string]options.Column)}
 }
 
 type DstTable struct {
@@ -51,17 +58,35 @@ func (dstTable *DstTable) Init(ctx context.Context) error {
 		xlog.Error(ctx, "Unable to init dst table", zap.Error(err), zap.String("path", dstTable.tablePath))
 		return fmt.Errorf("Init: %w", err)
 	}
-	var metaInfo TableMetaInfo
+	metaInfo := NewTableMetaInfo()
 	metaInfo.PrimaryKey = desc.PrimaryKey
-	xlog.Debug(ctx, "Got table meta info", zap.Strings("primary_keys", metaInfo.PrimaryKey))
-	dstTable.tableInfo = metaInfo
+	metaInfo.Name = desc.Name
+	for _, column := range desc.Columns {
+		metaInfo.Columns[column.Name] = column
+		xlog.Debug(ctx, "Column type", zap.String("col_name", column.Name), zap.String("type", column.Type.String()))
+	}
+	xlog.Debug(ctx, "Got table meta info", zap.Strings("primary_keys", metaInfo.PrimaryKey), zap.Any("columns", metaInfo.Columns))
+	dstTable.tableInfo = *metaInfo
 	return nil
 }
 
+func (dstTable *DstTable) PushAsSingleTx(ctx context.Context, data PushQuery) error {
+	return dstTable.client.DoTx(ctx,
+		func(ctx context.Context, tx table.TransactionActor) error {
+			_, err := tx.Execute(ctx, data.Query, &data.Parameters)
+			return err
+		})
+}
+
 func (dstTable *DstTable) Push(ctx context.Context, txData []types.TxData) error {
-	_, err := GenQuery(ctx, dstTable.tablePath, dstTable.tableInfo.PrimaryKey, txData)
+	query, err := GenQuery(ctx, dstTable.tableInfo, txData)
 	if err != nil {
 		xlog.Error(ctx, "Can't gen query", zap.Error(err))
+		return fmt.Errorf("Push: %w", err)
+	}
+	err = dstTable.PushAsSingleTx(ctx, query)
+	if err != nil {
+		xlog.Error(ctx, "Can't push query", zap.Error(err))
 		return fmt.Errorf("Push: %w", err)
 	}
 	return nil

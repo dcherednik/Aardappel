@@ -38,6 +38,11 @@ type StreamId struct {
 	PartitionId int64
 }
 
+type Position struct {
+	Step uint64
+	TxId uint64
+}
+
 // Hb data
 type HbData struct {
 	StreamId StreamId

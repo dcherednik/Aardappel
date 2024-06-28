@@ -34,7 +34,7 @@ type TxBatch struct {
 func NewProcessor(ctx context.Context, total int, stateTable string, client table.Client) (*Processor, error) {
 	var p Processor
 	p.hbTracker = hb_tracker.NewHeartBeatTracker(total)
-	p.txChannel = make(chan func() error)
+	p.txChannel = make(chan func() error, 100)
 	p.txQueue = tx_queue.NewTxQueue()
 	p.dstServerClient = client
 	stateQuery := fmt.Sprintf("SELECT step_id FROM %v WHERE id = 0;", stateTable)
@@ -65,6 +65,7 @@ func (processor *Processor) EnqueueHb(ctx context.Context, hb types.HbData) {
 		xlog.Debug(ctx, "skip old hb", zap.Uint64("step", hb.Step))
 		return
 	}
+	xlog.Debug(ctx, "Enqueue hb", zap.Uint64("step", hb.Step))
 	processor.txChannel <- func() error {
 		return processor.hbTracker.AddHb(hb)
 	}
@@ -76,6 +77,7 @@ func (processor *Processor) EnqueueTx(ctx context.Context, tx types.TxData) {
 		xlog.Debug(ctx, "skip old tx", zap.Uint64("step", tx.Step))
 		return
 	}
+	xlog.Debug(ctx, "Enqueue tx", zap.Uint64("step", tx.Step))
 	processor.txChannel <- func() error {
 		processor.txQueue.PushTx(tx)
 		return nil

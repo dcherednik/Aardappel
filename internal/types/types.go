@@ -22,6 +22,7 @@ type TxData struct {
 	Step          uint64
 	TxId          uint64
 	OperationType TxOperationType
+	TableId       uint32 //local id of table in current replication
 }
 
 func (data TxData) IsUpdateOperation() bool {
@@ -34,7 +35,7 @@ func (data TxData) IsEraseOperation() bool {
 
 // ReaderId + PartitionId for uniq partition id in hb tracker
 type StreamId struct {
-	ReaderId    uint8
+	ReaderId    uint32
 	PartitionId int64
 }
 

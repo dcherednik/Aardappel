@@ -83,7 +83,8 @@ func (processor *Processor) FormatTx(ctx context.Context) (*TxBatch, error) {
 			zap.String("operation_type", data.OperationType.String()),
 			zap.Any("key", data.KeyValues),
 			zap.Uint64("step", data.Step),
-			zap.Uint64("tx_id", data.TxId))
+			zap.Uint64("tx_id", data.TxId),
+			zap.Uint32("tableId:", data.TableId))
 	}
 	return &TxBatch{TxData: txs, Hb: hb}, nil
 }

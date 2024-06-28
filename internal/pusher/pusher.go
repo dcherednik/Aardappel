@@ -11,8 +11,8 @@ import (
 
 func PushAsSingleTx(ctx context.Context, client table.Client, data dst_table.PushQuery, position types.Position, stateTable string) error {
 	stateStoreQuery := fmt.Sprintf(`
-DECLARE $stateStepId AS Uint64;
-DECLARE $stateTxId AS Uint64;
+--DECLARE $stateStepId AS Uint64;
+--DECLARE $stateTxId AS Uint64;
 
 UPSERT INTO
     %v

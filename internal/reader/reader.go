@@ -145,6 +145,7 @@ func ReadTopic(ctx context.Context, readerId uint32, reader *topicreader.Reader,
 			return
 		}
 
+		continue
 		err = reader.Commit(msg.Context(), msg)
 		if err != nil {
 			xlog.Error(ctx, "Unable to commit", zap.Error(err))

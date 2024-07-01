@@ -150,12 +150,5 @@ func ReadTopic(ctx context.Context, readerId uint32, reader *topicreader.Reader,
 			xlog.Error(ctx, "Unknown format of topic message")
 			return
 		}
-
-		continue
-		err = reader.Commit(msg.Context(), msg)
-		if err != nil {
-			xlog.Error(ctx, "Unable to commit", zap.Error(err))
-			return
-		}
 	}
 }

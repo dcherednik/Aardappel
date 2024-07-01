@@ -121,5 +121,16 @@ func main() {
 		if err != nil {
 			xlog.Fatal(ctx, "Unable to push tx", zap.Error(err))
 		}
+		for i := 0; i < len(batch.TxData); i++ {
+			err := batch.TxData[i].CommitTopic()
+			if err != nil {
+				xlog.Fatal(ctx, "Unable to commit topic fot dataTx", zap.Error(err))
+			}
+		}
+		xlog.Debug(ctx, "commit hb in topic")
+		err = batch.Hb.CommitTopic()
+		if err != nil {
+			xlog.Fatal(ctx, "Unable to commit topic fot Hb", zap.Error(err))
+		}
 	}
 }

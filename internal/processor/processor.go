@@ -61,11 +61,11 @@ func NewProcessor(ctx context.Context, total int, stateTable string, client tabl
 
 func (processor *Processor) EnqueueHb(ctx context.Context, hb types.HbData) {
 	// Skip all before we already processed
-	if hb.Step <= processor.lastStep {
+	if hb.Step < processor.lastStep {
+		_ = hb.CommitTopic()
 		xlog.Debug(ctx, "skip old hb", zap.Uint64("step", hb.Step))
 		return
 	}
-	xlog.Debug(ctx, "Enqueue hb", zap.Uint64("step", hb.Step))
 	processor.txChannel <- func() error {
 		return processor.hbTracker.AddHb(hb)
 	}
@@ -73,11 +73,11 @@ func (processor *Processor) EnqueueHb(ctx context.Context, hb types.HbData) {
 
 func (processor *Processor) EnqueueTx(ctx context.Context, tx types.TxData) {
 	// Skip all before we already processed
-	if tx.Step <= processor.lastStep {
+	if tx.Step < processor.lastStep {
+		_ = tx.CommitTopic()
 		xlog.Debug(ctx, "skip old tx", zap.Uint64("step", tx.Step))
 		return
 	}
-	xlog.Debug(ctx, "Enqueue tx", zap.Uint64("step", tx.Step))
 	processor.txChannel <- func() error {
 		processor.txQueue.PushTx(tx)
 		return nil

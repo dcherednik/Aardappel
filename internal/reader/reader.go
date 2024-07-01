@@ -130,6 +130,9 @@ func ReadTopic(ctx context.Context, readerId uint32, reader *topicreader.Reader,
 				xlog.Error(ctx, "ParseTxData: Error parsing tx data", zap.Error(err))
 				return
 			}
+			data.CommitTopic = func() error {
+				return reader.Commit(msg.Context(), msg)
+			}
 			channel.EnqueueTx(ctx, data)
 			// Add tx to txQueue
 		} else if topicData.Resolved != nil {
@@ -137,6 +140,9 @@ func ReadTopic(ctx context.Context, readerId uint32, reader *topicreader.Reader,
 			if err != nil {
 				xlog.Error(ctx, "ParseTxData: Error parsing hb data", zap.Error(err))
 				return
+			}
+			data.CommitTopic = func() error {
+				return reader.Commit(msg.Context(), msg)
 			}
 			channel.EnqueueHb(ctx, data)
 			// Update last hb for partition

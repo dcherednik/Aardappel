@@ -23,6 +23,7 @@ type TxData struct {
 	TxId          uint64
 	OperationType TxOperationType
 	TableId       uint32 //local id of table in current replication
+	CommitTopic   func() error
 }
 
 func (data TxData) IsUpdateOperation() bool {
@@ -46,6 +47,7 @@ type Position struct {
 
 // Hb data
 type HbData struct {
-	StreamId StreamId
-	Step     uint64
+	StreamId    StreamId
+	Step        uint64
+	CommitTopic func() error
 }
